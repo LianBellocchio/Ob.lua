@@ -1,51 +1,89 @@
 require("orbwalker")
 require("targetSelector")
-require("utils")
+require "utils"
 
-local API_KEY = "<tu_api_key_aqui>"
-local REGION = "na1"
-local CHAMPION_DATA_FILE = "champion_data.json"
-local MIN_CHAMPION_GAMES = 100
+local Orbwalker = {}
 
-local function getChampionData()
-    local summonerName = ObjectManager:GetLocalPlayer().Name
-    local url = "https://" .. REGION .. ".api.riotgames.com/lol/summoner/v4/summoners/by-name/" .. summonerName .. "?api_key=" .. API_KEY
-    local response = GetUrl(url)
-    local summonerData = json.decode(response)
-    local summonerId = summonerData.id
-    
-    url = "https://" .. REGION .. ".api.riotgames.com/lol/spectator/v4/active-games/by-summoner/" .. summonerId .. "?api_key=" .. API_KEY
-    response = GetUrl(url)
-    local gameData = json.decode(response)
-    
-    local championData = {}
-    for _, participant in ipairs(gameData.participants) do
-        local championId = participant.championId
-        local championName = GetChampionName(championId)
-        local totalGames = getChampionTotalGames(championId)
-        
-        if totalGames >= MIN_CHAMPION_GAMES then
-            table.insert(championData, {
-                id = championId,
-                name = championName,
-                totalGames = totalGames
-            })
+function Orbwalker:new(targetSelector)
+    local orb = {}
+    setmetatable(orb, self)
+    self.__index = self
+
+    orb.targetSelector = targetSelector
+    orb.lastAttackTime = 0
+    orb.lastWindupTime = 0
+    orb.windupTime = 0
+    orb.range = 0
+    orb.projectileSpeed = 0
+    orb.minionProjectileSpeed = 0
+
+    return orb
+end
+
+function Orbwalker:__attack(target)
+    if target then
+        Control.Attack(target)
+        self.lastAttackTime = Game.GetTime()
+    end
+end
+
+function Orbwalker:__orbwalk()
+    local target = self.targetSelector:GetTarget()
+    if target then
+        if Game.CanUseSpell(0) == 0 and Game.GetTime() > self.lastWindupTime + self.windupTime then
+            local targetDistance = Player.Position:Distance(target.Position)
+            if targetDistance <= self.range then
+                self:__attack(target)
+            elseif self.projectileSpeed > 0 and targetDistance <= self.range + self.projectileSpeed * self.windupTime then
+                self:__attack(target)
+            end
+        end
+        Player:MoveTo(target.Position)
+    else
+        Player:MoveTo(mousePos)
+    end
+end
+
+function Orbwalker:Tick()
+    if Game.GetTime() < self.lastAttackTime + self.windupTime then
+        return
+    end
+
+    local target = self.targetSelector:GetTarget()
+    if target then
+        local targetDistance = Player.Position:Distance(target.Position)
+        local safeDistance = self.range
+        if Player.HasBuff("itemduskbladebuff") then
+            safeDistance = self.range + 75
+        end
+        if targetDistance <= safeDistance then
+            self:__orbwalk()
+        end
+    else
+        Player:MoveTo(mousePos)
+    end
+end
+
+function Orbwalker:OnPreAttack(args)
+    local target = args.Target
+    if target then
+        local targetDistance = Player.Position:Distance(target.Position)
+        local safeDistance = self.range
+        if Player.HasBuff("itemduskbladebuff") then
+            safeDistance = self.range + 75
+        end
+        if targetDistance > safeDistance then
+            args.Process = false
         end
     end
-    
-    table.sort(championData, function(a, b) return a.totalGames > b.totalGames end)
-    
-    SaveFile(CHAMPION_DATA_FILE, json.encode(championData))
 end
 
-function OnLoad()
-    getChampionData()
-end
-
-function OnTick()
-    local targetSelector = TargetSelector()
-    local target = targetSelector:GetTarget()
-    Orbwalker:Orbwalk(target)
-end
-
-Callback.Add("Tick", OnTick)
+function Orbwalker:OnPostAttack(args)
+    local target = args.Target
+    if target then
+        if self.minionProjectileSpeed > 0 and target.IsMinion then
+            self.lastWindupTime = Game.GetTime()
+            self.windupTime = (self.range + Player.BoundingRadius + target.BoundingRadius) / self.minionProjectileSpeed
+        elseif self.projectileSpeed > 0 then
+            self.lastWindupTime = Game.GetTime()
+            self.windupTime = (self.range + Player.BoundingRadius + target.BoundingRadius) / self.projectile
