@@ -1,89 +1,65 @@
-require("orbwalker")
-require("targetSelector")
-require "utils"
-
 local Orbwalker = {}
 
-function Orbwalker:new(targetSelector)
-    local orb = {}
-    setmetatable(orb, self)
-    self.__index = self
+local targetSelector = require("targetSelector")
 
-    orb.targetSelector = targetSelector
-    orb.lastAttackTime = 0
-    orb.lastWindupTime = 0
-    orb.windupTime = 0
-    orb.range = 0
-    orb.projectileSpeed = 0
-    orb.minionProjectileSpeed = 0
+Orbwalker.lastAttackTime = 0
 
-    return orb
+function Orbwalker:new(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  return o
 end
 
-function Orbwalker:__attack(target)
-    if target then
-        Control.Attack(target)
-        self.lastAttackTime = Game.GetTime()
+function Orbwalker:attack(target)
+  if target and target.isEnemy and target.isTargetable and target.isVisible and not target.isDead then
+    if os.clock() - self.lastAttackTime > 1 / myHero.attackSpeed then
+      Control.Attack(target)
+      self.lastAttackTime = os.clock()
     end
+  end
 end
 
-function Orbwalker:__orbwalk()
-    local target = self.targetSelector:GetTarget()
-    if target then
-        if Game.CanUseSpell(0) == 0 and Game.GetTime() > self.lastWindupTime + self.windupTime then
-            local targetDistance = Player.Position:Distance(target.Position)
-            if targetDistance <= self.range then
-                self:__attack(target)
-            elseif self.projectileSpeed > 0 and targetDistance <= self.range + self.projectileSpeed * self.windupTime then
-                self:__attack(target)
-            end
-        end
-        Player:MoveTo(target.Position)
+function Orbwalker:move()
+  if not Control.IsKeyDown(HK_TCO) then
+    Control.Move(mousePos)
+  end
+end
+
+function Orbwalker:orbwalk(target)
+  if target and target.isEnemy and target.isTargetable and target.isVisible and not target.isDead then
+    local distance = myHero.pos:DistanceTo(target.pos)
+    local extraTime = 0.1
+    if myHero.activeSpell.valid and myHero.activeSpell.startTime ~= 0 and myHero.activeSpell.name ~= "SummonerTeleport" then
+      extraTime = myHero.activeSpell.windUpTime - (os.clock() - myHero.activeSpell.startTime)
+      if extraTime < 0 then extraTime = 0 end
+    end
+    if os.clock() - self.lastAttackTime > extraTime + 1 / myHero.attackSpeed and distance < myHero.range + myHero.boundingRadius + target.boundingRadius then
+      Control.Attack(target)
+      self.lastAttackTime = os.clock()
     else
-        Player:MoveTo(mousePos)
+      self:move()
     end
+  else
+    self:move()
+  end
 end
 
-function Orbwalker:Tick()
-    if Game.GetTime() < self.lastAttackTime + self.windupTime then
-        return
-    end
-
-    local target = self.targetSelector:GetTarget()
-    if target then
-        local targetDistance = Player.Position:Distance(target.Position)
-        local safeDistance = self.range
-        if Player.HasBuff("itemduskbladebuff") then
-            safeDistance = self.range + 75
-        end
-        if targetDistance <= safeDistance then
-            self:__orbwalk()
-        end
+function Orbwalker:OrbwalkHeroes()
+  local target = targetSelector:GetTarget(1000)
+  if target and target.isEnemy then
+    local healthPercentage = target.health / target.maxHealth
+    local distance = myHero.pos:DistanceTo(target.pos)
+    if distance < myHero.range + myHero.boundingRadius + target.boundingRadius and healthPercentage < 0.5 then
+      self:attack(target)
+    elseif distance < 1000 and healthPercentage < 0.2 then
+      self:attack(target)
     else
-        Player:MoveTo(mousePos)
+      self:orbwalk(target)
     end
+  else
+    self:move()
+  end
 end
 
-function Orbwalker:OnPreAttack(args)
-    local target = args.Target
-    if target then
-        local targetDistance = Player.Position:Distance(target.Position)
-        local safeDistance = self.range
-        if Player.HasBuff("itemduskbladebuff") then
-            safeDistance = self.range + 75
-        end
-        if targetDistance > safeDistance then
-            args.Process = false
-        end
-    end
-end
-
-function Orbwalker:OnPostAttack(args)
-    local target = args.Target
-    if target then
-        if self.minionProjectileSpeed > 0 and target.IsMinion then
-            self.lastWindupTime = Game.GetTime()
-            self.windupTime = (self.range + Player.BoundingRadius + target.BoundingRadius) / self.minionProjectileSpeed
-        elseif self.projectileSpeed > 0 then
-            self.lastWindupTime = Game.GetTime()
-            self.windupTime = (self.range + Player.BoundingRadius + target.BoundingRadius) / self.projectile
+return Orbwalker
