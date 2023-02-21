@@ -35,3 +35,100 @@ end
 function GetMyHero()
     myHero = GetMyHeroObject()
 end
+
+-- Load required libraries
+local orb = module.load("orb")
+local ts = module.internal("TS")
+local menu = module.load("menu")
+local pred = module.internal("pred")
+local hpred = module.internal("s5prediction")
+
+-- Initialize menu
+local Menu = menu.new("Orbwalker", 200)
+
+-- Add submenus for targeting options
+local TargetSelector = Menu:addSubMenu("Target Selector")
+local EnemyMinions = TargetSelector:addSubMenu("Enemy Minions")
+local JungleMinions = TargetSelector:addSubMenu("Jungle Minions")
+local OtherUnits = TargetSelector:addSubMenu("Other Units")
+
+-- Targeting options
+local priorityTable = {
+    ["Champ"] = 5,
+    ["Normal"] = 1,
+    ["Siege"] = 2,
+    ["Super"] = 3,
+    ["Melee"] = 4
+}
+
+EnemyMinions:addHeader("Priority Table")
+for name, priority in pairs(priorityTable) do
+    EnemyMinions:addSlider(name, name, priority, 1, 5, 1)
+end
+
+JungleMinions:addSlider("Priority", "Priority", 2, 1, 5, 1)
+
+OtherUnits:addToggle("Prioritize champions", "prioritizeChampions", true)
+
+-- Draw options
+local DrawOptions = Menu:addSubMenu("Draw Options")
+DrawOptions:addToggle("Draw range", "drawRange", true)
+
+-- Initialize target selector
+local enemyMinionSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Minion end)
+local jungleMinionSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Jungle end)
+local otherSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Hero or unit.type == Obj_AI_Turret or unit.type == Obj_AI_Structure end)
+
+-- Initialize local variables
+local lastAttack = 0
+local lastMove = 0
+local mode = ""
+local target = nil
+
+-- Orbwalking function
+local function Orbwalk()
+    if target == nil then return end
+    if orb.core.can_attack() then
+        orb.core.attack(target)
+        lastAttack = game.time()
+    elseif orb.core.can_move() then
+        local movePos = target.pos:lerp(player.pos, -0.1)
+        orb.core.move(movePos)
+        lastMove = game.time()
+    end
+end
+
+-- Main function
+local function Main()
+    local targetMode = ""
+    if orb.menu.combat.key:get() then
+        targetMode = "kill"
+    elseif orb.menu.hybrid.key:get() then
+        targetMode = "harass"
+    end
+
+    if targetMode ~= "" then
+        target = enemyMinionSelector:getTarget()
+        if target == nil then
+            target = jungleMinionSelector:getTarget()
+        end
+        if target == nil then
+            target = otherSelector:getTarget()
+        end
+        if target ~= nil then
+            mode = targetMode
+            Orbwalk()
+            return
+        end
+    end
+
+    mode = "idle"
+    if lastAttack < lastMove then
+        orb.core.move(game.mouse_pos)
+    end
+end
+
+-- Draw function
+local function Draw()
+    if DrawOptions.drawRange:get
+
