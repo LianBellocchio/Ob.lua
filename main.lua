@@ -77,7 +77,7 @@ DrawOptions:addToggle("Draw range", "drawRange", true)
 -- Initialize target selector
 local enemyMinionSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Minion end)
 local jungleMinionSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Jungle end)
-local otherSelector = ts.get_selector(function(unit) return unit.isEnemy and unit.type == Obj_AI_Hero or unit.type == Obj_AI_Turret or unit.type == Obj_AI_Structure end)
+local otherSelector = ts.get_selector(function(unit) return unit.isEnemy and (unit.type == Obj_AI_Hero or unit.type == Obj_AI_Turret or unit.type == Obj_AI_Structure) end)
 
 -- Initialize local variables
 local lastAttack = 0
@@ -101,34 +101,4 @@ end
 -- Main function
 local function Main()
     local targetMode = ""
-    if orb.menu.combat.key:get() then
-        targetMode = "kill"
-    elseif orb.menu.hybrid.key:get() then
-        targetMode = "harass"
-    end
-
-    if targetMode ~= "" then
-        target = enemyMinionSelector:getTarget()
-        if target == nil then
-            target = jungleMinionSelector:getTarget()
-        end
-        if target == nil then
-            target = otherSelector:getTarget()
-        end
-        if target ~= nil then
-            mode = targetMode
-            Orbwalk()
-            return
-        end
-    end
-
-    mode = "idle"
-    if lastAttack < lastMove then
-        orb.core.move(game.mouse_pos)
-    end
-end
-
--- Draw function
-local function Draw()
-    if DrawOptions.drawRange:get
-
+    if orb.menu.combat
