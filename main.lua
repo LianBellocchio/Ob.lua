@@ -1,65 +1,37 @@
-local Orbwalker = {}
+require("orbwalker")
+require("targetSelector")
+require("utils")
 
-local targetSelector = require("targetSelector")
+-- Variables
+local enemyHeroes = {}
+local myHero = {}
+local target = nil
 
-Orbwalker.lastAttackTime = 0
+-- Functions
+function OnTick()
+    GetEnemies()
+    GetMyHero()
 
-function Orbwalker:new(o)
-  o = o or {}
-  setmetatable(o, self)
-  self.__index = self
-  return o
-end
+    if #enemyHeroes > 0 and myHero.dead == false then
+        target = GetTarget()
 
-function Orbwalker:attack(target)
-  if target and target.isEnemy and target.isTargetable and target.isVisible and not target.isDead then
-    if os.clock() - self.lastAttackTime > 1 / myHero.attackSpeed then
-      Control.Attack(target)
-      self.lastAttackTime = os.clock()
+        if target ~= nil and target.visible and target.dead == false then
+            AttackTarget(target)
+        else
+            MoveToMouse()
+        end
     end
-  end
 end
 
-function Orbwalker:move()
-  if not Control.IsKeyDown(HK_TCO) then
-    Control.Move(mousePos)
-  end
-end
-
-function Orbwalker:orbwalk(target)
-  if target and target.isEnemy and target.isTargetable and target.isVisible and not target.isDead then
-    local distance = myHero.pos:DistanceTo(target.pos)
-    local extraTime = 0.1
-    if myHero.activeSpell.valid and myHero.activeSpell.startTime ~= 0 and myHero.activeSpell.name ~= "SummonerTeleport" then
-      extraTime = myHero.activeSpell.windUpTime - (os.clock() - myHero.activeSpell.startTime)
-      if extraTime < 0 then extraTime = 0 end
+function GetEnemies()
+    enemyHeroes = {}
+    local _enemyHeroes = GetEnemyHeroes()
+    for i, enemy in ipairs(_enemyHeroes) do
+        if enemy and enemy.valid and enemy.visible and enemy.dead == false then
+            table.insert(enemyHeroes, enemy)
+        end
     end
-    if os.clock() - self.lastAttackTime > extraTime + 1 / myHero.attackSpeed and distance < myHero.range + myHero.boundingRadius + target.boundingRadius then
-      Control.Attack(target)
-      self.lastAttackTime = os.clock()
-    else
-      self:move()
-    end
-  else
-    self:move()
-  end
 end
-
-function Orbwalker:OrbwalkHeroes()
-  local target = targetSelector:GetTarget(1000)
-  if target and target.isEnemy then
-    local healthPercentage = target.health / target.maxHealth
-    local distance = myHero.pos:DistanceTo(target.pos)
-    if distance < myHero.range + myHero.boundingRadius + target.boundingRadius and healthPercentage < 0.5 then
-      self:attack(target)
-    elseif distance < 1000 and healthPercentage < 0.2 then
-      self:attack(target)
-    else
-      self:orbwalk(target)
-    end
-  else
-    self:move()
-  end
+function GetMyHero()
+    myHero = GetMyHeroObject()
 end
-
-return Orbwalker
