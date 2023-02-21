@@ -100,4 +100,8 @@ function orbwalker:GetDyingEnemyTarget()
     end
 
     return target
+<<<<<<< HEAD:src/orbwalker.lua
 end
+=======
+end
+>>>>>>> 6f3ed1b0c101de30f7149145961af1f635e56e51:orbwalker.lua
