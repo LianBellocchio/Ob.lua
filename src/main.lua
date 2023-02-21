@@ -32,6 +32,7 @@ function GetEnemies()
         end
     end
 end
+
 function GetMyHero()
     myHero = GetMyHeroObject()
 end
@@ -40,8 +41,6 @@ end
 local orb = module.load("orb")
 local ts = module.internal("TS")
 local menu = module.load("menu")
-local pred = module.internal("pred")
-local hpred = module.internal("s5prediction")
 
 -- Initialize menu
 local Menu = menu.new("Orbwalker", 200)
@@ -99,6 +98,30 @@ local function Orbwalk()
 end
 
 -- Main function
-local function Main()
-    local targetMode = ""
-    if orb.menu.combat
+    local function Main()
+        local targetMode = ""
+        if orb.menu.combat then
+            if orb.menu.hybrid then
+                targetMode = "Mixed"
+            else
+                targetMode = "Combo"
+            end
+        else
+            if orb.menu.lasthit then
+                targetMode = "LastHit"
+            elseif orb.menu.laneclear then
+                targetMode = "LaneClear"
+            elseif orb.menu.jungleclear then
+                targetMode = "JungleClear"
+            end
+        end
+    
+        if targetMode ~= "" then
+            local targetSelector = GetTargetSelector(targetMode)
+            target = targetSelector:GetTarget()
+        else
+            target = nil
+        end
+    
+        Orbwalk()
+    end

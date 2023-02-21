@@ -91,4 +91,13 @@ function orbwalker:GetDyingEnemyTarget()
 
     for i, enemy in ipairs(enemyHeroes) do
         local priority = GetTargetPriority(enemy)
-        local health
+        local healthPercent = enemy.health / enemy.maxHealth * 100
+
+        if priority > 0 and healthPercent < lowestHealthPercent and enemy.dead == false and enemy.visible then
+            lowestHealthPercent = healthPercent
+            target = enemy
+        end
+    end
+
+    return target
+end
